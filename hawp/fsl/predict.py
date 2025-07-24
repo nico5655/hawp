@@ -36,7 +36,7 @@ class ImageList(IterableDataset):
                 "width": w,
             }
             im=np.array(im)
-            print(im[...,0])
+            print(np.max(im[...,0]))
             print(im[...,-1])
             yield self.transform(im), meta
 
