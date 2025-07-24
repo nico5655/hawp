@@ -91,7 +91,7 @@ class Canvas:
             fig_file = cls.generic_name()
 
         if isinstance(image, str):
-            image = cv2.imread(image)[...,::-1]
+            image = cv2.imread(image)
         else:
             image = np.asarray(image)
 
