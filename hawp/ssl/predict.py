@@ -78,9 +78,10 @@ def main():
     image_list = [cv2.imread(fname,-1) for fname in args.img]
     for fname, image in zip(tqdm(args.img),image_list):
         pname = Path(fname)
+        print(image[:,:,-1].mean())
         image[image[:,:,-1]==0]=255
-        image=image[:,:,:3]
-        image=np.uint8(image.mean(axis=-1))
+        image=image[:,:,:-1]
+        image=image.mean(axis=-1)
         ori_shape = image.shape[:2]
         image_cp = copy.deepcopy(image)
         image_ = transform.resize(image_cp,(width,height))
@@ -114,7 +115,6 @@ def main():
             outpath = osp.join(args.saveto,pname.with_suffix('.json').name)
             with open(outpath,'w') as f:
                 json.dump(wireframe.jsonize(),f)
-        print(1/0)
 
 if __name__ == "__main__":
     main()
