@@ -137,7 +137,7 @@ def main():
         for key, value in extra_info.items():
             timings[key] += value
 
-        fig_file = osp.join(args.output,pname.with_suffix('.'+args.ext).name)
+        fig_file = osp.join(args.output,pname.with_suffix('.png').name)
 
         if output['lines_pred'] is None:
           print('skip')
