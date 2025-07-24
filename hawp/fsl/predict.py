@@ -35,7 +35,10 @@ class ImageList(IterableDataset):
                 "height": h,
                 "width": w,
             }
-            yield self.transform(np.array(im)), meta
+            im=np.array(im)
+            print(im[...,0])
+            print(im[...,-1])
+            yield self.transform(im), meta
 
 
 def parse_args():
