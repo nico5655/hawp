@@ -1,9 +1,10 @@
 import torch
-import random 
+import random
 import numpy as np
 import os
 import os.path as osp
 from tqdm import tqdm
+from skimage import io, transform
 
 from hawp.base import to_device, setup_logger, MetricLogger, save_config, show, WireframeGraph
 
@@ -26,7 +27,7 @@ def parse_args():
     aparser = argparse.ArgumentParser()
     aparser.add_argument('--metarch', default='HAWP', choices=MODELS.keys())
     aparser.add_argument('--cfg', default=os.path.join(
-        os.path.dirname(__file__),'config','hawpv3.yaml'), 
+        os.path.dirname(__file__),'config','hawpv3.yaml'),
         help='model configuration')
     aparser.add_argument('--ckpt', required=True, help='checkpoint')
     aparser.add_argument('-t','--threshold', default=0.05,type=float)
@@ -53,14 +54,15 @@ def parse_args():
 def main():
     args = parse_args()
     model_config.merge_from_file(args.cfg)
-    
+
     model = MODELS[args.metarch](model_config, gray_scale=True)
+
     model = model.eval().to(args.device)
     weight_path = args.ckpt
     state_dict = torch.load(weight_path,map_location='cpu')
 
     model.load_state_dict(state_dict)
-    
+
 
     imagepath_list = [args.img]
 
@@ -76,14 +78,16 @@ def main():
     image_list = [cv2.imread(fname,0) for fname in args.img]
     for fname, image in zip(tqdm(args.img),image_list):
         pname = Path(fname)
-        # image = cv2.imread(fname,0)
+        print(image.shape)
+        #image = cv2.imread(fname,0)
         ori_shape = image.shape[:2]
+        image.s
         image_cp = copy.deepcopy(image)
-        image_ = cv2.resize(image_cp,(width,height))
+        image_ = transform.resize(image_cp,(width,height))
         image_ = torch.from_numpy(image_).float()/255.0
         image_ = image_[None,None].to(args.device)
-        
-        
+
+
         meta = {
             'width': ori_shape[1],
             'height':ori_shape[0],
@@ -93,14 +97,17 @@ def main():
         with torch.no_grad():
             outputs, _ = model(image_,[meta])
 
-        fig_file = None if args.saveto is None or args.ext in ['txt','json']else osp.join(args.saveto,pname.with_suffix('.'+args.ext).name)
+        fig_file = None if args.saveto is None or args.ext in ['txt','json'] else osp.join(args.saveto,pname.with_suffix('.'+args.ext).name)
 
+        if outputs['lines_pred'] is None:
+          print('skip')
+          continue
         with show.image_canvas(fname, fig_file=fig_file) as ax:
             painter.draw_wireframe(ax,outputs)
 
         # if args.saveto and args.
         indices = WireframeGraph.xyxy2indices(outputs['juncs_pred'],outputs['lines_pred'])
-        
+
         wireframe = WireframeGraph(outputs['juncs_pred'], outputs['juncs_score'], indices, outputs['lines_score'], outputs['width'], outputs['height'])
 
         if args.saveto is not None and args.ext == 'json':

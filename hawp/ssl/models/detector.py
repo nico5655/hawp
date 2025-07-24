@@ -1,3 +1,4 @@
+
 from collections import defaultdict
 from easydict import EasyDict
 
@@ -25,7 +26,7 @@ class HAWP(HAWPBase):
             distance_threshold =  cfg.ENCODER.DIS_TH)
 
         self.hafm_encoder = HAFMencoder(cfg)
-
+        print(gray_scale)
         self.backbone = build_backbone(cfg,gray_scale=gray_scale)
 
         self.n_dyn_junc = cfg.MODEL.PARSING_HEAD.N_DYN_JUNC
@@ -53,13 +54,13 @@ class HAWP(HAWPBase):
         self.num_junctions_inference = 300
         self.junction_threshold_hm = 0.008
         self.use_residual = int(cfg.MODEL.PARSING_HEAD.USE_RESIDUAL)
-        
+
         assert cfg.MODEL.LOI_POOLING.TYPE in ['softmax', 'sigmoid']
         assert cfg.MODEL.LOI_POOLING.ACTIVATION in ['relu', 'gelu']
 
         self.loi_cls_type = cfg.MODEL.LOI_POOLING.TYPE
         self.loi_layer_norm = cfg.MODEL.LOI_POOLING.LAYER_NORM
-        self.loi_activation = nn.ReLU if cfg.MODEL.LOI_POOLING.ACTIVATION == 'relu' else nn.GELU        
+        self.loi_activation = nn.ReLU if cfg.MODEL.LOI_POOLING.ACTIVATION == 'relu' else nn.GELU
 
         self.fc1 = nn.Conv2d(256, self.dim_junction_feature, 1)
 
@@ -73,7 +74,7 @@ class HAWP(HAWPBase):
             fc2.append(nn.ReLU(True))
             fc2.append(nn.Linear(self.dim_fc,self.dim_fc))
 
-        
+
         self.fc2 = nn.Sequential(*fc2)
         self.fc2_res = nn.Sequential(nn.Linear((1+self.use_init_lines)*(self.num_points-2)*self.dim_edge_feature, self.dim_fc),nn.ReLU(True))
 
@@ -92,7 +93,7 @@ class HAWP(HAWPBase):
             self.loss = nn.BCEWithLogitsLoss(reduction='none')
         else:
             raise NotImplementError()
-        
+
         self.use_heatmap_decoder = cfg.MODEL.USE_LINE_HEATMAP
         if self.use_heatmap_decoder:
             self.heatmap_decoder = PixelShuffleDecoder(input_feat_dim=256)
@@ -100,11 +101,11 @@ class HAWP(HAWPBase):
         self.bce_loss = nn.BCEWithLogitsLoss(reduction='none')
         self.train_step = 0
 
-    
+
     def wireframe_matcher(self, juncs_pred, lines_pred, is_train=False, is_shuffle=False):
         cost1 = torch.sum((lines_pred[:,:2]-juncs_pred[:,None])**2,dim=-1)
         cost2 = torch.sum((lines_pred[:,2:]-juncs_pred[:,None])**2,dim=-1)
-        
+
         dis1, idx_junc_to_end1 = cost1.min(dim=0)
         dis2, idx_junc_to_end2 = cost2.min(dim=0)
         length = torch.sum((lines_pred[:,:2]-lines_pred[:,2:])**2,dim=-1)
@@ -129,7 +130,7 @@ class HAWP(HAWPBase):
              )
 
             cost_atoi_argsort = cost_atoi.argsort(descending=True)
-            
+
 
         lines_pred_kept = lines_pred[iskeep][cost_atoi_argsort]
         idx_lines_for_junctions = idx_lines_for_junctions[cost_atoi_argsort]
@@ -138,15 +139,15 @@ class HAWP(HAWPBase):
 
         idx_lines_for_junctions = idx_lines_for_junctions[perm]
         lines_init = lines_pred_kept[perm]
-        
+
         if is_train:
             idx_lines_for_junctions_mirror = torch.cat((idx_lines_for_junctions[:,1,None],idx_lines_for_junctions[:,0,None]),dim=1)
             idx_lines_for_junctions = torch.cat((idx_lines_for_junctions, idx_lines_for_junctions_mirror))
-        
+
         #lines_adjusted = torch.cat((juncs_pred[idx_lines_for_junctions[:,0]], juncs_pred[idx_lines_for_junctions[:,1]]),dim=1)
         lines_adjusted = juncs_pred[idx_lines_for_junctions].reshape(-1,4)
         #lines_adjusted = torch.stack((juncs_pred[idx_lines_for_junctions[:,0]], juncs_pred[idx_lines_for_junctions[:,1]]),dim=1)
-        
+
         return lines_adjusted, lines_init, perm, idx_lines_for_junctions
 
     def forward_test_with_junction(self, images, junctions, annotations = None):
@@ -167,7 +168,7 @@ class HAWP(HAWPBase):
         loi_features_thin = self.fc3(features)
         loi_features_aux = self.fc4(features)
 
-        
+
         output = outputs[0]
         md_pred = output[:,:3].sigmoid()
         dis_pred = output[:,3:4].sigmoid()
@@ -179,18 +180,18 @@ class HAWP(HAWPBase):
         extra_info['time_backbone'] = time.time() - extra_info['time_backbone']
 
         batch_size = md_pred.size(0)
-        
+
         lines_pred = self.hafm_decoding(md_pred, dis_pred, res_pred if self.use_residual else None, flatten = True)[0]
 
-        
-        juncs_pred = junctions
-        
-        _ = torch.ones((juncs_pred.shape[0]),dtype=juncs_pred.dtype,device=device)
-        
 
-        
+        juncs_pred = junctions
+
+        _ = torch.ones((juncs_pred.shape[0]),dtype=juncs_pred.dtype,device=device)
+
+
+
         lines_adjusted, lines_init, perm, _ = self.wireframe_matcher(juncs_pred, lines_pred)
-        
+
         e1_features = self.bilinear_sampling(loi_features[0], lines_adjusted[:,:2]-0.5).t()
         e2_features = self.bilinear_sampling(loi_features[0], lines_adjusted[:,2:]-0.5).t()
 
@@ -208,7 +209,7 @@ class HAWP(HAWPBase):
             scores = logits.softmax(dim=-1)[:,1]
         else:
             scores = logits.sigmoid()[:,0]
-        
+
         sarg = torch.argsort(scores,descending=True)
 
         lines_final = lines_adjusted[sarg]
@@ -274,7 +275,7 @@ class HAWP(HAWPBase):
         extra_info['time_backbone'] = time.time() - extra_info['time_backbone']
 
         batch_size = md_pred.size(0)
-        
+
         lines_pred = self.hafm_decoding(md_pred, dis_pred, res_pred if self.use_residual else None, flatten = True)[0]
 
 
@@ -283,10 +284,10 @@ class HAWP(HAWPBase):
         #building
         # self.num_junctions_inference = 512
         topK = min(self.num_junctions_inference, int((jloc_pred_nms>self.junction_threshold_hm).float().sum().item()))
-        
+
         juncs_pred, _ = self.get_junctions(jloc_pred_nms,joff_pred[0], topk=topK,th=self.junction_threshold_hm)
         if juncs_pred.shape[0] == 0:
-            return {'lines_pred': None, 'lines_score': None}
+            return {'lines_pred': None, 'lines_score': None},None
         lines_adjusted, lines_init, perm, _ = self.wireframe_matcher(juncs_pred, lines_pred)
         matcher_time = time.time()
         # lines_adjusted_trials = []
@@ -298,7 +299,7 @@ class HAWP(HAWPBase):
         # matcher_time = time.time()-matcher_time
         # lines_init_trials = torch.stack(lines_init_trials)
         # is_stable = lines_init_trials.std(dim=0).mean(dim=-1)<1e-6
-        
+
         e1_features = self.bilinear_sampling(loi_features[0], lines_adjusted[:,:2]-0.5).t()
         e2_features = self.bilinear_sampling(loi_features[0], lines_adjusted[:,2:]-0.5).t()
 
@@ -367,7 +368,7 @@ class HAWP(HAWPBase):
 
         self.train_step += 1
 
-        
+
         outputs, features = self.backbone(images)
 
         loss_dict = {
@@ -386,7 +387,7 @@ class HAWP(HAWPBase):
             loss_dict['loss_heatmap'] = torch.mean((self.loss(heatmaps_pred,annotations['heatmap'][:,0].long()))*valid_mask)
         extra_info = defaultdict(list)
 
-                
+
         loi_features = self.fc1(features)
         loi_features_thin = self.fc3(features)
         loi_features_aux = self.fc4(features)
@@ -397,18 +398,18 @@ class HAWP(HAWPBase):
         res_pred = output[:,4:5].sigmoid()
         jloc_pred= output[:,5:7].softmax(1)[:,1:]
         joff_pred= output[:,7:9].sigmoid() - 0.5
-        
-        # regional_scores = 
+
+        # regional_scores =
 
         # lines_batch = []
 
         batch_size = md_pred.size(0)
 
         lines_batch = self.hafm_decoding(md_pred, dis_pred, res_pred if self.use_residual else None, flatten=False, scale=self.hafm_encoder.dis_th)
-        
+
         loss_dict_, extra_info = self.refinement_train(lines_batch, jloc_pred, joff_pred, loi_features, loi_features_thin,loi_features_aux, metas)
 
-        
+
         loss_dict['loss_pos'] += loss_dict_['loss_pos']
         loss_dict['loss_neg'] += loss_dict_['loss_neg']
         loss_dict['loss_lineness'] = loss_dict_['loss_lineness']
@@ -430,14 +431,14 @@ class HAWP(HAWPBase):
         # mask = mask2.float()
         # epsilon = (mask.sum().item()==0)*1e-6
         epsilon = 0
-        
+
         lines_tgt = lines_tgt.repeat((1,2*self.use_residual+1,1,1,1))
         lines_len = torch.sum((lines_tgt[...,:2]-lines_tgt[...,2:])**2,dim=-1)
 
         if targets is not None:
             for nstack, output in enumerate(outputs):
                 loss_map = torch.mean(F.l1_loss(output[:,:3].sigmoid(), targets['md'],reduction='none'),dim=1,keepdim=True)
-                
+
                 loss_dict['loss_md']  += torch.mean(loss_map*mask) / (torch.mean(mask)+epsilon)
                 loss_map = F.l1_loss(output[:,3:4].sigmoid(), targets['dis'], reduction='none')
                 loss_dict['loss_dis'] += torch.mean(loss_map*mask) /(torch.mean(mask)+epsilon)
@@ -447,10 +448,10 @@ class HAWP(HAWPBase):
                 loss_dict['loss_joff'] += sigmoid_l1_loss(output[:,7:9], targets['joff'], -0.5, targets['jloc'])
 
                 lines_learned = self.hafm_decoding(output[:,:3].sigmoid(), output[:,3:4].sigmoid(), output[:,4:5].sigmoid() if self.use_residual else None, flatten=False, scale=self.hafm_encoder.dis_th)
-                
+
                 wt = 1/lines_len.clamp_min(1.0)*mask2
                 loss_map = F.l1_loss(lines_learned, lines_tgt,reduction='none').mean(dim=-1)
-                
+
                 loss_dict['loss_aux'] += torch.mean(loss_map*wt)/(torch.mean(mask)+epsilon)
 
         for key in extra_info.keys():
@@ -464,13 +465,13 @@ class HAWP(HAWPBase):
         batch_size = lines_batch.shape[0]
         device = lines_batch.device
 
-        
+
         for i, meta in enumerate(metas):
             if meta['lines'].shape[0] == 0:# or meta['junc'].shape[0] == 0:
                 continue
             lines_pred = lines_batch[i].reshape(-1,4).detach()
-            
-            
+
+
             junction_gt = meta['junc']
             lines_gt = meta['lines']
 
@@ -485,17 +486,17 @@ class HAWP(HAWPBase):
             extra_info['recall_hafm-15'] += ((mcost<15).float().mean())
 
             lines_pred_labels = (lines_matching_cost.min(dim=1)[0]<15).float()
-            
+
 
             # valid_idx = (lines_matching_cost.min(dim=1)[0]<100)
-            
+
             lines_pred_feat = self.compute_loi_features(loi_features_aux[i],lines_pred.detach(),self.tspan[...,1:-1])
             lines_pred_logits = self.line_mlp(lines_pred_feat).flatten()
             # lines_pred_labels = lines_pred_labels[valid_idx]
-            
+
             loss_dict['loss_lineness'] += self.bce_loss(lines_pred_logits,lines_pred_labels.float()).mean()/batch_size
-            
-            N = junction_gt.size(0)   
+
+            N = junction_gt.size(0)
 
             with torch.no_grad():
                 juncs_pred, _ = self.get_junctions(self.non_maximum_suppression(jloc_pred[i]),joff_pred[i], topk=min(N*2+2,self.n_dyn_junc))
@@ -513,9 +514,9 @@ class HAWP(HAWPBase):
             extra_info['recall_adjust-05'] += ((mcost<5).float().mean())
             extra_info['recall_adjust-10'] += ((mcost<10).float().mean())
             extra_info['recall_adjust-15'] += ((mcost<15).float().mean())
-            
+
             cost_, match_ = torch.sum((juncs_pred-junction_gt[:,None])**2,dim=-1).min(0)
-            
+
             match_[cost_>1.5*1.5] = N
             Lpos = meta['Lpos']
             labels = Lpos[match_[idx_lines_for_junctions[:,0]],match_[idx_lines_for_junctions[:,1]]]
@@ -532,7 +533,7 @@ class HAWP(HAWPBase):
             #     )
             # plt.show()
 
-            
+
             labels_for_train = labels
 
             lines_for_train = torch.cat((lines_for_train,meta['lpre']))
@@ -543,7 +544,7 @@ class HAWP(HAWPBase):
             e2_features = self.bilinear_sampling(loi_features[i], lines_for_train[:,2:]-0.5).t()
             f1 = self.compute_loi_features(loi_features_thin[i],lines_for_train,self.tspan[...,1:-1])
             line_features = torch.cat((e1_features,e2_features,f1),dim=-1)
-            
+
             if self.use_init_lines:
                 f2 = self.compute_loi_features(loi_features_aux[i],lines_for_train_init,self.tspan[...,1:-1])
                 line_features = torch.cat((line_features, f2),dim=-1)
@@ -556,7 +557,7 @@ class HAWP(HAWPBase):
                 loss_ = self.loss(logits.flatten(), labels_for_train)
             else:
                 loss_ = self.loss(logits, labels_for_train.long())
-            
+
             if (labels_for_train==1).sum() == 0:
                 loss_positive = torch.zeros_like(loss_[labels_for_train==1].mean())
             else:
