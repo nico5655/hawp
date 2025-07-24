@@ -92,7 +92,6 @@ class Canvas:
 
         if isinstance(image, str):
             image = cv2.imread(image,-1)
-            print(image.shape)
             if len(image.shape)==3 and image.shape[-1]==4:
                 image[image[...,-1]==0]=255
                 image=image[...,:-1]
