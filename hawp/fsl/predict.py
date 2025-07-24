@@ -95,6 +95,9 @@ def main():
     logger.info(args)
     logger.info(f"Loaded configuration file {config_path}")
 
+    show.painters.HAWPainter.confidence_threshold = 0.1
+    show.Canvas.show = False
+    painter = show.painters.HAWPainter()
     set_random_seed(args.seed)
 
     device = cfg.MODEL.DEVICE
@@ -119,11 +122,26 @@ def main():
     outputs = []
     timings = defaultdict(float)
     for tensor, meta in tqdm(dataloader, total=len(args.images)):
+        fname=meta['filename']
+        pname=Path(fname)
         with torch.no_grad():
             output, extra_info = model(tensor.to(device), [meta])
         outputs.append(post_process(output))
         for key, value in extra_info.items():
             timings[key] += value
+
+        fig_file = osp.join(args.output,pname.with_suffix('.'+args.ext).name)
+
+        if output['lines_pred'] is None:
+          print('skip')
+          continue
+        with show.image_canvas(fname, fig_file=fig_file) as ax:
+            painter.draw_wireframe(ax,output)
+
+        # if args.saveto and args.
+        indices = WireframeGraph.xyxy2indices(output['juncs_pred'],output['lines_pred'])
+
+        wireframe = WireframeGraph(output['juncs_pred'], output['juncs_score'], indices, output['lines_score'], output['width'], output['height'])
 
     logger.info(f"Timings : {dict(timings)}")
 

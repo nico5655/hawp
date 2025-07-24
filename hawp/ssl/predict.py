@@ -78,7 +78,6 @@ def main():
     image_list = [cv2.imread(fname,-1) for fname in args.img]
     for fname, image in zip(tqdm(args.img),image_list):
         pname = Path(fname)
-        print(image[:,:,-1].mean())
         image[image[:,:,-1]==0]=255
         image=image[:,:,:-1]
         image=image.mean(axis=-1)
