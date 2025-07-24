@@ -37,7 +37,7 @@ class ImageList(IterableDataset):
             }
             im=np.array(im)
             im[im[...,-1]==0]=255
-            im=img[...,:-1]
+            im=im[...,:-1]
             yield self.transform(im), meta
 
 
