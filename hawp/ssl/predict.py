@@ -81,7 +81,6 @@ def main():
         print(image[:,:,-1])
         #image = cv2.imread(fname,0)
         ori_shape = image.shape[:2]
-        image.s
         image_cp = copy.deepcopy(image)
         image_ = transform.resize(image_cp,(width,height))
         image_ = torch.from_numpy(image_).float()/255.0
