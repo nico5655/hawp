@@ -127,7 +127,7 @@ def main():
     outputs = []
     timings = defaultdict(float)
     for tensor, meta in tqdm(dataloader, total=len(args.images)):
-        fname=meta['filename']
+        fname=meta['filename'][0]
         pname=Path(fname)
         with torch.no_grad():
             output, extra_info = model(tensor.to(device), [meta])
