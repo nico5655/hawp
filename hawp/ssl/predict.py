@@ -78,8 +78,9 @@ def main():
     image_list = [cv2.imread(fname,-1) for fname in args.img]
     for fname, image in zip(tqdm(args.img),image_list):
         pname = Path(fname)
-        print(image[:,:,-1])
-        #image = cv2.imread(fname,0)
+        image[image[:,:,-1]==0]=255
+        image=image[:,:,:3]
+        image=np.uint8(image.mean(axis=-1))
         ori_shape = image.shape[:2]
         image_cp = copy.deepcopy(image)
         image_ = transform.resize(image_cp,(width,height))
