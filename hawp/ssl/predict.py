@@ -86,7 +86,7 @@ def main():
         image_ = transform.resize(image_cp,(width,height))
         image_ = torch.from_numpy(image_).float()/255.0
         image_ = image_[None,None].to(args.device)
-
+        
 
         meta = {
             'width': ori_shape[1],
@@ -114,7 +114,7 @@ def main():
             outpath = osp.join(args.saveto,pname.with_suffix('.json').name)
             with open(outpath,'w') as f:
                 json.dump(wireframe.jsonize(),f)
-
+        print(1/0)
 
 if __name__ == "__main__":
     main()
