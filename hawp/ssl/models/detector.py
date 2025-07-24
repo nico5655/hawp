@@ -26,7 +26,6 @@ class HAWP(HAWPBase):
             distance_threshold =  cfg.ENCODER.DIS_TH)
 
         self.hafm_encoder = HAFMencoder(cfg)
-        print(gray_scale)
         self.backbone = build_backbone(cfg,gray_scale=gray_scale)
 
         self.n_dyn_junc = cfg.MODEL.PARSING_HEAD.N_DYN_JUNC

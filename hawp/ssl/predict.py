@@ -55,7 +55,7 @@ def main():
     args = parse_args()
     model_config.merge_from_file(args.cfg)
 
-    model = MODELS[args.metarch](model_config, gray_scale=False)
+    model = MODELS[args.metarch](model_config, gray_scale=True)
 
     model = model.eval().to(args.device)
     weight_path = args.ckpt
